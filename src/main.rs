@@ -9,14 +9,25 @@ use std::collections::HashSet;
 use crate::types::HttpRequestStatus;
 
 
+const HTTP_METHODS_LIST: HashSet<String> = HashSet::from(
+    [
+        "GET",
+        "HEAD",
+        "POST",
+        "PUT",
+        "DELETE",
+        "CONNECT",
+        "OPTIONS",
+        "TRACE",
+        "PATCH"
+    ].map(| methods | methods.to_string())
+);
+
 fn main() {
     // Bind the local port 8000, then, precise "unwrap" to close the server when
     // the program got an error.
     // TODO: manage the errors to avoid the webserver closing with errors
     let listener = TcpListener::bind("127.0.0.1:8000").unwrap();
-
-    // Generate the http methods set.
-    let http_method_list: HashSet<String> = types::generate_http_method_set();
 
     // Iterate through the listener.incoming() stream iterator.
     for stream in listener.incoming() {
@@ -27,12 +38,12 @@ fn main() {
         println!("Connection established !");
 
         // Process the new connection
-        handle_request(stream, http_method_list.clone());
+        handle_request(stream);
     }
 }
 
 // Create a new function named 'handle_request' which take a mutable TcpStream argument.
-fn handle_request(mut stream: TcpStream, http_method_list: HashSet<String>) {
+fn handle_request(mut stream: TcpStream) {
     // We'll create a new Buffer React to read the content of the mut stream
     let buffer_reader = BufReader::new(&mut stream);
 
@@ -54,7 +65,7 @@ fn handle_request(mut stream: TcpStream, http_method_list: HashSet<String>) {
     let first_request_line = http_request_iterator.next().unwrap();
 
     // Parsing the status line to get the informations about it.
-    let http_request_content = parse_status_line(first_request_line, http_method_list.clone());
+    let http_request_content = parse_status_line(first_request_line);
 
     // Create a variable for the status line
     let status_line = format!("HTTP/{} 200 OK", http_request_content.http_version);
@@ -88,7 +99,7 @@ fn handle_request(mut stream: TcpStream, http_method_list: HashSet<String>) {
     println!("Response: {:#?}", response);
 }
 
-fn parse_status_line(status_line: &String, http_method_list: HashSet<String>) -> HttpRequestStatus {
+fn parse_status_line(status_line: &String) -> HttpRequestStatus {
     // Split the status line into piece of text without spaces.
     let status_line_parts: Vec<_> = status_line.split_whitespace().collect();
 
@@ -98,7 +109,7 @@ fn parse_status_line(status_line: &String, http_method_list: HashSet<String>) ->
     }
 
     // If the first argument (the method) is not valid, we deny the request
-    if !http_method_list.contains(status_line_parts[0]) {
+    if !HTTP_METHODS_LIST.contains(status_line_parts[0]) {
         panic!("The method is not correct.")
     }
 
