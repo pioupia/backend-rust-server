@@ -5,12 +5,11 @@ use std::{
     io::{prelude::*, BufReader},
     net::{TcpListener, TcpStream},
 };
-use std::collections::HashSet;
 use crate::types::HttpRequestStatus;
+use phf::{phf_set};
 
 
-const HTTP_METHODS_LIST: HashSet<String> = HashSet::from(
-    [
+const HTTP_METHODS_LIST: phf::Set<&'static str> = phf_set! {
         "GET",
         "HEAD",
         "POST",
@@ -20,8 +19,7 @@ const HTTP_METHODS_LIST: HashSet<String> = HashSet::from(
         "OPTIONS",
         "TRACE",
         "PATCH"
-    ].map(| methods | methods.to_string())
-);
+};
 
 fn main() {
     // Bind the local port 8000, then, precise "unwrap" to close the server when
