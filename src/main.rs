@@ -1,4 +1,5 @@
 use std::{
+    fs,
     io::{prelude::*, BufReader},
     net::{TcpListener, TcpStream},
 };
@@ -40,7 +41,18 @@ fn handle_request(mut stream: TcpStream) {
         // Then, we collect theses lines into a vector.
         .collect();
 
-    let response = "HTTP/1.1 200 OK\r\n\r\n";
+    // Create a variable for the status line
+    let status_line = "HTTP/1.1 200 OK";
+
+    // Read the content of the index file to string
+    let content = fs::read_to_string("./src/pages/index.html").unwrap();
+
+    // Take its len
+    let content_len = content.len();
+
+    // Create the response by formatting the string.
+    let response =
+        format!("{status_line}\r\nContent-Length: {content_len}\r\n\r\n{content}");
 
     // Return the response as byte slice, and unwrap it to avoid errors
     stream.write_all(response.as_bytes()).unwrap();
