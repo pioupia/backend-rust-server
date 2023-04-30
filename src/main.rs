@@ -54,13 +54,23 @@ fn handle_request(mut stream: TcpStream, http_method_list: HashSet<String>) {
     let first_request_line = http_request_iterator.next().unwrap();
 
     // Parsing the status line to get the informations about it.
-    parse_status_line(first_request_line, http_method_list.clone());
+    let http_request_content = parse_status_line(first_request_line, http_method_list.clone());
 
     // Create a variable for the status line
-    let status_line = "HTTP/1.1 200 OK";
+    let status_line = format!("HTTP/{} 200 OK", http_request_content.http_version);
 
     // Read the content of the index file to string
-    let content = fs::read_to_string("./src/pages/index.html").unwrap();
+    let content;
+
+    if http_request_content.path == "/" {
+        // Return dynamically the index page
+        content = fs::read_to_string("./src/pages/index.html").unwrap();
+    } else {
+        // Return dynamically the HTML pages
+        content = fs::read_to_string(
+            format!("./src/pages/{}.html", http_request_content.path)
+        ).unwrap();
+    }
 
     // Take its len
     let content_len = content.len();
