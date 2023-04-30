@@ -1,8 +1,12 @@
+pub mod types;
+
 use std::{
     fs,
     io::{prelude::*, BufReader},
     net::{TcpListener, TcpStream},
 };
+use std::collections::HashSet;
+use crate::types::HttpRequestStatus;
 
 
 fn main() {
@@ -10,6 +14,9 @@ fn main() {
     // the program got an error.
     // TODO: manage the errors to avoid the webserver closing with errors
     let listener = TcpListener::bind("127.0.0.1:8000").unwrap();
+
+    // Generate the http methods set.
+    let http_method_list: HashSet<String> = types::generate_http_method_set();
 
     // Iterate through the listener.incoming() stream iterator.
     for stream in listener.incoming() {
@@ -20,12 +27,12 @@ fn main() {
         println!("Connection established !");
 
         // Process the new connection
-        handle_request(stream);
+        handle_request(stream, http_method_list.clone());
     }
 }
 
 // Create a new function named 'handle_request' which take a mutable TcpStream argument.
-fn handle_request(mut stream: TcpStream) {
+fn handle_request(mut stream: TcpStream, http_method_list: HashSet<String>) {
     // We'll create a new Buffer React to read the content of the mut stream
     let buffer_reader = BufReader::new(&mut stream);
 
@@ -40,6 +47,14 @@ fn handle_request(mut stream: TcpStream) {
         .take_while(| res | !res.is_empty())
         // Then, we collect theses lines into a vector.
         .collect();
+
+    let mut http_request_iterator = http_request.iter();
+
+    // Take the first request line
+    let first_request_line = http_request_iterator.next().unwrap();
+
+    // Parsing the status line to get the informations about it.
+    parse_status_line(first_request_line, http_method_list.clone());
 
     // Create a variable for the status line
     let status_line = "HTTP/1.1 200 OK";
@@ -61,4 +76,53 @@ fn handle_request(mut stream: TcpStream) {
     println!("Request: {:#?}", http_request);
     // Print in the console the response for this request.
     println!("Response: {:#?}", response);
+}
+
+fn parse_status_line(status_line: &String, http_method_list: HashSet<String>) -> HttpRequestStatus {
+    // Split the status line into piece of text without spaces.
+    let status_line_parts: Vec<_> = status_line.split_whitespace().collect();
+
+    // If the status line has more than 3 spaces, we cant accept the request (sorry)
+    if status_line_parts.len() != 3 {
+        panic!("The HTTP Request status is invalid")
+    }
+
+    // If the first argument (the method) is not valid, we deny the request
+    if !http_method_list.contains(status_line_parts[0]) {
+        panic!("The method is not correct.")
+    }
+
+    // If the first char of the second argument is not a '/', we know that the path is not valid.
+    if !status_line_parts[1].chars().nth(0).eq(&Option::from('/')) {
+        panic!("The path is invalid.")
+    }
+
+    // We know that the HTTP version should take 8 chars
+    // 'HTTP/x.x' like HTTP/2.0
+    // If not, the HTTP version is invalid
+    if status_line_parts[2].len() != 8 {
+        panic!("The HTTP version is invalid.");
+    }
+
+    // We separate the http_version from the HTTP string (by slicing the string)
+    // We're removing the "HTTP/" part.
+    let http_version = &status_line_parts[2][5..8];
+
+    // If the HTTP version is not 1.1 or 1.2, we know that we can't do anything for that (sorry).
+    // So, the version is not supported or doesn't exist.
+    if http_version != "1.1" && http_version != "1.2" {
+        panic!("The HTTP version is invalid/not supported.")
+    }
+
+    // TODO: separate the path and the query parameters
+    let http_request_content = HttpRequestStatus {
+        method: status_line_parts[0].to_string(),
+        http_version: http_version.parse().expect("The HTTP version should be a float32."),
+        path: status_line_parts[1].to_string(),
+    };
+
+    println!("{{ method: {0}, http_version: {1}, path: {2} }}",
+             http_request_content.method, http_request_content.http_version, http_request_content.path);
+
+    return http_request_content;
 }
