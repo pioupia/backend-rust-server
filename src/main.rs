@@ -40,6 +40,13 @@ fn handle_request(mut stream: TcpStream) {
         // Then, we collect theses lines into a vector.
         .collect();
 
+    let response = "HTTP/1.1 200 OK\r\n\r\n";
+
+    // Return the response as byte slice, and unwrap it to avoid errors
+    stream.write_all(response.as_bytes()).unwrap();
+
     // Print in the console the lines of the request.
     println!("Request: {:#?}", http_request);
+    // Print in the console the response for this request.
+    println!("Response: {:#?}", response);
 }
