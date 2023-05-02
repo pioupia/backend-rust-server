@@ -1,10 +1,6 @@
 pub mod types;
 
-use std::{
-    fs,
-    io::{prelude::*, BufReader},
-    net::{TcpListener, TcpStream},
-};
+use std::{fs, io::{prelude::*, BufReader}, net::{TcpListener, TcpStream}};
 use crate::types::HttpRequestStatus;
 use phf::{phf_set};
 
@@ -48,12 +44,15 @@ fn main() {
         println!("Connection established !");
 
         // Process the new connection, and pass a reference to the stream
-        handle_request(&stream);
+        match handle_request(&stream) {
+            Err(_) => {}
+            _ => {}
+        }
     }
 }
 
 // Create a new function named 'handle_request' which take a mutable TcpStream argument.
-fn handle_request(stream: &TcpStream) {
+fn handle_request(stream: &TcpStream) -> Result<bool, &str> {
     // We'll create a new Buffer React to read the content of the mut stream
     let buffer_reader = BufReader::new(stream);
 
@@ -67,7 +66,7 @@ fn handle_request(stream: &TcpStream) {
             Err(e) => {
                 println!("An error has occurred during a request: {}", e);
 
-                send_response(stream, &String::from("HTTP/1.1 500 Internal Server Error"));
+                send_response(stream, &String::from("HTTP/1.1 500 Internal Server Error\r\n\r\n"));
 
                 panic!("An error has occurred during the request");
             }
@@ -86,14 +85,14 @@ fn handle_request(stream: &TcpStream) {
         None => {
             println!("An error has occurred during the parse of the request");
 
-            send_response(stream, &String::from("HTTP/1.1 500 Internal Server Error"));
+            send_response(stream, &String::from("HTTP/1.1 500 Internal Server Error\r\n\r\n"));
 
-            panic!("An error has occurred during the parsing of the request");
+            return Err("An error has occurred during the parsing of the request");
         }
     };
 
     // Parsing the status line to get the informations about it.
-    let http_request_content = parse_status_line(first_request_line);
+    let http_request_content = parse_status_line(first_request_line).unwrap();
 
     // Create a variable for the status line
     let status_line = format!("HTTP/{} 200 OK", http_request_content.http_version);
@@ -106,11 +105,11 @@ fn handle_request(stream: &TcpStream) {
         content = match fs::read_to_string("./src/pages/index.html") {
             Ok(s) => s,
             Err(e) => {
-                println!("An error has occurred when searching for the correct file: {}", e);
+                println!("An error has occurred when searching for the correct index file: {}", e);
 
-                send_response(stream, &String::from("HTTP/1.1 404 Not Found"));
+                send_response(stream, &String::from("HTTP/1.1 404 Not Found\r\n\r\n"));
 
-                panic!("An error has occurred during the search of the file");
+                return Err("An error has occurred during the search of the index file");
             }
         };
     } else {
@@ -120,11 +119,11 @@ fn handle_request(stream: &TcpStream) {
         ) {
             Ok(s) => s,
             Err(e) => {
+                send_response(stream, &String::from("HTTP/1.1 404 NOT FOUND\r\n\r\n"));
+
                 println!("An error has occurred when searching for the correct file: {}", e);
 
-                send_response(stream, &String::from("HTTP/1.1 404 Not Found"));
-
-                panic!("An error has occurred during the search of the file");
+                return Err("An error has occurred during the search of the file");
             }
         };
     }
@@ -143,6 +142,8 @@ fn handle_request(stream: &TcpStream) {
     println!("Request: {:#?}", http_request);
     // Print in the console the response for this request.
     println!("Response: {:#?}", response);
+
+    Ok(true)
 }
 
 fn send_response(mut stream: &TcpStream, response: &String) {
@@ -154,30 +155,30 @@ fn send_response(mut stream: &TcpStream, response: &String) {
     }
 }
 
-fn parse_status_line(status_line: &String) -> HttpRequestStatus {
+fn parse_status_line(status_line: &String) -> Result<HttpRequestStatus, &str> {
     // Split the status line into piece of text without spaces.
     let status_line_parts: Vec<_> = status_line.split_whitespace().collect();
 
     // If the status line has more than 3 spaces, we cant accept the request (sorry)
     if status_line_parts.len() != 3 {
-        panic!("The HTTP Request status is invalid")
+        return Err("The HTTP Request status is invalid")
     }
 
     // If the first argument (the method) is not valid, we deny the request
     if !HTTP_METHODS_LIST.contains(status_line_parts[0]) {
-        panic!("The method is not correct.")
+        return Err("The method is not correct.")
     }
 
     // If the first char of the second argument is not a '/', we know that the path is not valid.
     if !status_line_parts[1].chars().nth(0).eq(&Option::from('/')) {
-        panic!("The path is invalid.")
+        return Err("The path is invalid.")
     }
 
     // We know that the HTTP version should take 8 chars
     // 'HTTP/x.x' like HTTP/2.0
     // If not, the HTTP version is invalid
     if status_line_parts[2].len() != 8 {
-        panic!("The HTTP version is invalid.");
+        return Err("The HTTP version is invalid.");
     }
 
     // We separate the http_version from the HTTP string (by slicing the string)
@@ -187,7 +188,7 @@ fn parse_status_line(status_line: &String) -> HttpRequestStatus {
     // If the HTTP version is not 1.1 or 1.2, we know that we can't do anything for that (sorry).
     // So, the version is not supported or doesn't exist.
     if http_version != "1.1" && http_version != "1.2" {
-        panic!("The HTTP version is invalid/not supported.")
+        return Err("The HTTP version is invalid/not supported.")
     }
 
     // TODO: separate the path and the query parameters
@@ -200,5 +201,5 @@ fn parse_status_line(status_line: &String) -> HttpRequestStatus {
     println!("{{ method: {0}, http_version: {1}, path: {2} }}",
              http_request_content.method, http_request_content.http_version, http_request_content.path);
 
-    return http_request_content;
+    return Ok(http_request_content);
 }
