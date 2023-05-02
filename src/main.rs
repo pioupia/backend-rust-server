@@ -25,32 +25,53 @@ fn main() {
     // Bind the local port 8000, then, precise "unwrap" to close the server when
     // the program got an error.
     // TODO: manage the errors to avoid the webserver closing with errors
-    let listener = TcpListener::bind("127.0.0.1:8000").unwrap();
+    let listener = match TcpListener::bind("127.0.0.1:8000") {
+        Ok(num) => num,
+        Err(_) => {
+            println!("Address already in used.");
+            std::process::exit(1);
+        }
+    };
 
     // Iterate through the listener.incoming() stream iterator.
     for stream in listener.incoming() {
         // Get the stream without errors
         // Or close the program.
-        let stream = stream.unwrap();
+        let stream = match stream {
+            Ok(s) => s,
+            Err(e) => {
+                println!("{}", e);
+                continue;
+            }
+        };
 
         println!("Connection established !");
 
-        // Process the new connection
-        handle_request(stream);
+        // Process the new connection, and pass a reference to the stream
+        handle_request(&stream);
     }
 }
 
 // Create a new function named 'handle_request' which take a mutable TcpStream argument.
-fn handle_request(mut stream: TcpStream) {
+fn handle_request(stream: &TcpStream) {
     // We'll create a new Buffer React to read the content of the mut stream
-    let buffer_reader = BufReader::new(&mut stream);
+    let buffer_reader = BufReader::new(stream);
 
     // We'll create a new vector to collect theses lines of request
     let http_request: Vec<_> = buffer_reader
         .lines()
         // We iterate through the lines, we "define" a "res" variable, and unwrap it.
         // Same as before, the errors will stop the program, so its not very clean and for production
-        .map(| res | res.unwrap())
+        .map(| res | match res {
+            Ok(s) => s,
+            Err(e) => {
+                println!("An error has occurred during a request: {}", e);
+
+                send_response(stream, &String::from("HTTP/1.1 500 Internal Server Error"));
+
+                panic!("An error has occurred during the request");
+            }
+        })
         // The browser signals the end of an HTTP request by sending two newline characters in a row.
         // So, we iterate through the lines, and show when there is an empty line.
         .take_while(| res | !res.is_empty())
@@ -89,12 +110,21 @@ fn handle_request(mut stream: TcpStream) {
         format!("{status_line}\r\nContent-Length: {content_len}\r\n\r\n{content}");
 
     // Return the response as byte slice, and unwrap it to avoid errors
-    stream.write_all(response.as_bytes()).unwrap();
+    send_response(stream, &response);
 
     // Print in the console the lines of the request.
     println!("Request: {:#?}", http_request);
     // Print in the console the response for this request.
     println!("Response: {:#?}", response);
+}
+
+fn send_response(mut stream: &TcpStream, response: &String) {
+    match stream.write_all(response.as_bytes()) {
+        Ok(s) => s,
+        Err(e) => {
+            println!("An error has occurred when sending a response:\nError: {0}\nResponse: {1}", e, response);
+        }
+    }
 }
 
 fn parse_status_line(status_line: &String) -> HttpRequestStatus {
