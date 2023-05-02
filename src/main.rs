@@ -92,7 +92,16 @@ fn handle_request(stream: &TcpStream) -> Result<bool, &str> {
     };
 
     // Parsing the status line to get the informations about it.
-    let http_request_content = parse_status_line(first_request_line).unwrap();
+    let http_request_content = match parse_status_line(first_request_line) {
+        Ok(t) => t,
+        Err(e) => {
+            println!("An error has occurred during the HTTP parsing of the request: {}", e);
+
+            send_response(stream, &String::from("HTTP/1.1 500 Internal Server Error\r\n\r\n"));
+
+            return Err("Not good bro")
+        }
+    };
 
     // Create a variable for the status line
     let status_line = format!("HTTP/{} 200 OK", http_request_content.http_version);
