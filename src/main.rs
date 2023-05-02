@@ -62,7 +62,7 @@ fn handle_request(stream: &TcpStream) {
         .lines()
         // We iterate through the lines, we "define" a "res" variable, and unwrap it.
         // Same as before, the errors will stop the program, so its not very clean and for production
-        .map(| res | match res {
+        .map(|res| match res {
             Ok(s) => s,
             Err(e) => {
                 println!("An error has occurred during a request: {}", e);
@@ -74,14 +74,23 @@ fn handle_request(stream: &TcpStream) {
         })
         // The browser signals the end of an HTTP request by sending two newline characters in a row.
         // So, we iterate through the lines, and show when there is an empty line.
-        .take_while(| res | !res.is_empty())
+        .take_while(|res| !res.is_empty())
         // Then, we collect theses lines into a vector.
         .collect();
 
     let mut http_request_iterator = http_request.iter();
 
     // Take the first request line
-    let first_request_line = http_request_iterator.next().unwrap();
+    let first_request_line = match http_request_iterator.next() {
+        Some(t) => t,
+        None => {
+            println!("An error has occurred during the parse of the request");
+
+            send_response(stream, &String::from("HTTP/1.1 500 Internal Server Error"));
+
+            panic!("An error has occurred during the parsing of the request");
+        }
+    };
 
     // Parsing the status line to get the informations about it.
     let http_request_content = parse_status_line(first_request_line);
@@ -94,12 +103,30 @@ fn handle_request(stream: &TcpStream) {
 
     if http_request_content.path == "/" {
         // Return dynamically the index page
-        content = fs::read_to_string("./src/pages/index.html").unwrap();
+        content = match fs::read_to_string("./src/pages/index.html") {
+            Ok(s) => s,
+            Err(e) => {
+                println!("An error has occurred when searching for the correct file: {}", e);
+
+                send_response(stream, &String::from("HTTP/1.1 404 Not Found"));
+
+                panic!("An error has occurred during the search of the file");
+            }
+        };
     } else {
         // Return dynamically the HTML pages
-        content = fs::read_to_string(
+        content = match fs::read_to_string(
             format!("./src/pages/{}.html", http_request_content.path)
-        ).unwrap();
+        ) {
+            Ok(s) => s,
+            Err(e) => {
+                println!("An error has occurred when searching for the correct file: {}", e);
+
+                send_response(stream, &String::from("HTTP/1.1 404 Not Found"));
+
+                panic!("An error has occurred during the search of the file");
+            }
+        };
     }
 
     // Take its len
