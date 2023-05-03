@@ -57,25 +57,31 @@ fn handle_request(stream: &TcpStream) -> Result<bool, &str> {
     let buffer_reader = BufReader::new(stream);
 
     // We'll create a new vector to collect theses lines of request
-    let http_request: Vec<_> = buffer_reader
-        .lines()
-        // We iterate through the lines, we "define" a "res" variable, and unwrap it.
-        // Same as before, the errors will stop the program, so its not very clean and for production
-        .map(|res| match res {
-            Ok(s) => s,
+    let mut http_request: Vec<String> = Vec::new();
+
+    // Let's looping into the buffer lines
+    for lines in buffer_reader.lines() {
+        // And catch some errors
+        match lines {
+            Ok(s) => {
+                // If the string is empty, may its the end of the HTTP request, you don't think ?
+                if s.is_empty() {
+                    // Let's break our loop
+                    break;
+                }
+
+                // Otherwise, we have to push our request into our vector.
+                http_request.push(s);
+            },
             Err(e) => {
                 println!("An error has occurred during a request: {}", e);
 
                 send_response(stream, &String::from("HTTP/1.1 500 Internal Server Error\r\n\r\n"));
 
-                panic!("An error has occurred during the request");
+                return Err("An error has occurred during the request");
             }
-        })
-        // The browser signals the end of an HTTP request by sending two newline characters in a row.
-        // So, we iterate through the lines, and show when there is an empty line.
-        .take_while(|res| !res.is_empty())
-        // Then, we collect theses lines into a vector.
-        .collect();
+        }
+    }
 
     let mut http_request_iterator = http_request.iter();
 
