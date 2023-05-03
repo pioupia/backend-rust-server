@@ -52,7 +52,7 @@ fn main() {
 }
 
 // Create a new function named 'handle_request' which take a mutable TcpStream argument.
-fn handle_request(stream: &TcpStream) -> Result<bool, &str> {
+fn handle_request(stream: &TcpStream) -> Result<(), &str> {
     // We'll create a new Buffer React to read the content of the mut stream
     let buffer_reader = BufReader::new(stream);
 
@@ -158,7 +158,7 @@ fn handle_request(stream: &TcpStream) -> Result<bool, &str> {
     // Print in the console the response for this request.
     println!("Response: {:#?}", response);
 
-    Ok(true)
+    Ok(())
 }
 
 fn send_response(mut stream: &TcpStream, response: &String) {
