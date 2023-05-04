@@ -39,8 +39,6 @@ fn main() {
             }
         };
 
-        println!("Connection established !");
-
         // Process the new connection, and pass a reference to the stream
         match handle_request(&stream) {
             Err(_) => {}
@@ -110,53 +108,42 @@ fn handle_request(stream: &TcpStream) -> Result<(), &str> {
     // Create a variable for the status line
     let status_line = format!("HTTP/{} 200 OK", http_request_content.http_version);
 
-    // Read the content of the index file to string
-    let content;
+    // Take the path of the file
+    let mut path = String::from("./src/pages/index.html");
 
-    if http_request_content.path == "/" {
-        // Return dynamically the index page
-        content = match fs::read_to_string("./src/pages/index.html") {
-            Ok(s) => s,
-            Err(e) => {
-                println!("An error has occurred when searching for the correct index file: {}", e);
-
-                send_response(stream, &String::from("HTTP/1.1 404 Not Found\r\n\r\n"));
-
-                return Err("An error has occurred during the search of the index file");
-            }
-        };
-    } else {
-        // Return dynamically the HTML pages
-        content = match fs::read_to_string(
-            format!("./src/pages/{}.html", http_request_content.path)
-        ) {
-            Ok(s) => s,
-            Err(e) => {
-                send_response(stream, &String::from("HTTP/1.1 404 NOT FOUND\r\n\r\n"));
-
-                println!("An error has occurred when searching for the correct file: {}", e);
-
-                return Err("An error has occurred during the search of the file");
-            }
-        };
+    if http_request_content.path != "/" {
+        path = format!("./src/pages/{}.html", http_request_content.path);
     }
 
-    // Take its len
-    let content_len = content.len();
-
-    // Create the response by formatting the string.
-    let response =
-        format!("{status_line}\r\nContent-Length: {content_len}\r\n\r\n{content}");
-
-    // Return the response
-    send_response(stream, &response);
-
-    // Print in the console the lines of the request.
-    println!("Request: {:#?}", http_request);
-    // Print in the console the response for this request.
-    println!("Response: {:#?}", response);
+    // Return the file
+    send_file(&status_line, &path, stream, false);
 
     Ok(())
+}
+
+fn send_file(status_line: &String, file_path: &String, stream: &TcpStream, error: bool)  {
+    match fs::read_to_string(file_path) {
+        Ok(content) => {
+            // Take the length of the content
+            let content_len = content.len();
+
+            // Create the response by formatting the string.
+            let response =
+                format!("{status_line}\r\nContent-Length: {content_len}\r\n\r\n{content}");
+
+            // Return the response
+            send_response(stream, &response);
+        },
+        Err(e) => {
+            println!("An error has occurred when searching for the correct file: {}", e);
+
+            if error {
+                send_response(stream, &String::from("HTTP/1.1 404 NOT FOUND\r\n\r\n"));
+            } else {
+                send_file(&String::from("HTTP/1.1 404 NOT FOUND"), &String::from("./src/pages/404.html"), stream, true);
+            }
+        }
+    };
 }
 
 fn send_response(mut stream: &TcpStream, response: &String) {
