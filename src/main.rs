@@ -18,9 +18,7 @@ const HTTP_METHODS_LIST: phf::Set<&'static str> = phf_set! {
 };
 
 fn main() {
-    // Bind the local port 8000, then, precise "unwrap" to close the server when
-    // the program got an error.
-    // TODO: manage the errors to avoid the webserver closing with errors
+    // Bind the local port 8000.
     let listener = match TcpListener::bind("127.0.0.1:8000") {
         Ok(num) => num,
         Err(_) => {
@@ -150,7 +148,7 @@ fn handle_request(stream: &TcpStream) -> Result<(), &str> {
     let response =
         format!("{status_line}\r\nContent-Length: {content_len}\r\n\r\n{content}");
 
-    // Return the response as byte slice, and unwrap it to avoid errors
+    // Return the response
     send_response(stream, &response);
 
     // Print in the console the lines of the request.
