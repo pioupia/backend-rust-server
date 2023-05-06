@@ -3,6 +3,7 @@ pub mod types;
 use std::{fs, io::{prelude::*, BufReader}, net::{TcpListener, TcpStream}};
 use crate::types::HttpRequestStatus;
 use phf::{phf_set};
+use backend_rust_server::ThreadPool;
 
 
 const HTTP_METHODS_LIST: phf::Set<&'static str> = phf_set! {
@@ -27,6 +28,16 @@ fn main() {
         }
     };
 
+    // Create a new ThreadPool
+    let pool = match ThreadPool::new(4) {
+        Ok(p) => p,
+        Err(e) => {
+            println!("An error has occurred. The ThreadPool could not load: {}", e);
+            return
+        }
+    };
+
+
     // Iterate through the listener.incoming() stream iterator.
     for stream in listener.incoming() {
         // Get the stream without errors
@@ -40,10 +51,12 @@ fn main() {
         };
 
         // Process the new connection, and pass a reference to the stream
-        match handle_request(&stream) {
-            Err(_) => {}
-            _ => {}
-        }
+        pool.execute(move || {
+            match handle_request(&stream) {
+                Ok(a) => a,
+                Err(_) => {}
+            }
+        });
     }
 }
 
