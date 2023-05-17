@@ -2,5 +2,6 @@
 pub struct HttpRequestStatus {
     pub method: String,
     pub http_version: f32,
-    pub path: String
+    pub path: String,
+    pub query: Option<String>
 }

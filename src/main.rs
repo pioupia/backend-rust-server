@@ -204,11 +204,28 @@ fn parse_status_line(status_line: &String) -> Result<HttpRequestStatus, &str> {
         return Err("The HTTP version is invalid/not supported.")
     }
 
+    let path_string_delimiters = status_line_parts[1].to_string();
+    let path_delimiters = path_string_delimiters.split_once('?');
+    let mut query: Option<String> = None;
+
+    let path = match path_delimiters {
+        Some(path) => {
+            query = Some(path.1.to_string());
+            path.0
+        },
+        None => {
+            status_line_parts[1]
+        }
+    };
+
+
     // TODO: separate the path and the query parameters
+    // Query path delimiter /\?(([A-Za-z_%0-9]+)=([A-Za-z_%0-9-~.']+))(&(([A-Za-z_%0-9]+)=([A-Za-z_%0-9-~.']+)))*/g
     let http_request_content = HttpRequestStatus {
         method: status_line_parts[0].to_string(),
         http_version: http_version.parse().expect("The HTTP version should be a float32."),
-        path: status_line_parts[1].to_string(),
+        path: path.to_string(),
+        query
     };
 
     println!("{{ method: {0}, http_version: {1}, path: {2} }}",
