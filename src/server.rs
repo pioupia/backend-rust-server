@@ -76,7 +76,7 @@ impl Server {
 
             // Process the new connection, and pass a reference to the stream
             pool.execute(move || {
-                match self.handle_request(&stream) {
+                match Server::handle_request(&stream) {
                     Ok(a) => a,
                     Err(_) => {}
                 }
@@ -87,7 +87,7 @@ impl Server {
     }
 
     // Create a new function named 'handle_request' which take a mutable TcpStream argument.
-    fn handle_request(&self, stream: &TcpStream) -> Result<(), &str> {
+    fn handle_request(stream: &TcpStream) -> Result<(), &str> {
         // We'll create a new Buffer React to read the content of the mut stream
         let buffer_reader = BufReader::new(stream);
 
@@ -111,7 +111,7 @@ impl Server {
                 Err(e) => {
                     println!("An error has occurred during a request: {}", e);
 
-                    self.send_response(stream, &String::from("HTTP/1.1 500 Internal Server Error\r\n\r\n"));
+                    send_response(stream, &String::from("HTTP/1.1 500 Internal Server Error\r\n\r\n"));
 
                     return Err("An error has occurred during the request");
                 }
@@ -126,19 +126,19 @@ impl Server {
             None => {
                 println!("An error has occurred during the parse of the request");
 
-                self.send_response(stream, &String::from("HTTP/1.1 500 Internal Server Error\r\n\r\n"));
+                send_response(stream, &String::from("HTTP/1.1 500 Internal Server Error\r\n\r\n"));
 
                 return Err("An error has occurred during the parsing of the request");
             }
         };
 
         // Parsing the status line to get the informations about it.
-        let http_request_content = match self.parse_status_line(first_request_line) {
+        let http_request_content = match Server::parse_status_line(first_request_line) {
             Ok(t) => t,
             Err(e) => {
                 println!("An error has occurred during the HTTP parsing of the request: {}", e);
 
-                self.send_response(stream, &String::from("HTTP/1.1 500 Internal Server Error\r\n\r\n"));
+                send_response(stream, &String::from("HTTP/1.1 500 Internal Server Error\r\n\r\n"));
 
                 return Err("Not good bro")
             }
@@ -155,46 +155,12 @@ impl Server {
         }
 
         // Return the file
-        self.send_file(&status_line, &path, stream, false);
+        send_file(&status_line, &path, stream, false);
 
         Ok(())
     }
 
-    fn send_file(&self, status_line: &String, file_path: &String, stream: &TcpStream, error: bool)  {
-        match fs::read_to_string(file_path) {
-            Ok(content) => {
-                // Take the length of the content
-                let content_len = content.len();
-
-                // Create the response by formatting the string.
-                let response =
-                    format!("{status_line}\r\nContent-Length: {content_len}\r\n\r\n{content}");
-
-                // Return the response
-                self.send_response(stream, &response);
-            },
-            Err(e) => {
-                println!("An error has occurred when searching for the correct file: {}", e);
-
-                if error {
-                    self.send_response(stream, &String::from("HTTP/1.1 404 NOT FOUND\r\n\r\n"));
-                } else {
-                    self.send_file(&String::from("HTTP/1.1 404 NOT FOUND"), &String::from("./src/pages/404.html"), stream, true);
-                }
-            }
-        };
-    }
-
-    fn send_response(&self, mut stream: &TcpStream, response: &String) {
-        match stream.write_all(response.as_bytes()) {
-            Ok(s) => s,
-            Err(e) => {
-                println!("An error has occurred when sending a response:\nError: {0}\nResponse: {1}", e, response);
-            }
-        }
-    }
-
-    fn parse_status_line(&self, status_line: &String) -> Result<HttpRequestStatus, &str> {
+    fn parse_status_line(status_line: &String) -> Result<HttpRequestStatus, &str> {
         // Split the status line into piece of text without spaces.
         let status_line_parts: Vec<_> = status_line.split_whitespace().collect();
 
@@ -256,5 +222,39 @@ impl Server {
                  http_request_content.method, http_request_content.http_version, http_request_content.path);
 
         return Ok(http_request_content);
+    }
+}
+
+fn send_file(status_line: &String, file_path: &String, stream: &TcpStream, error: bool)  {
+    match fs::read_to_string(file_path) {
+        Ok(content) => {
+            // Take the length of the content
+            let content_len = content.len();
+
+            // Create the response by formatting the string.
+            let response =
+                format!("{status_line}\r\nContent-Length: {content_len}\r\n\r\n{content}");
+
+            // Return the response
+            send_response(stream, &response);
+        },
+        Err(e) => {
+            println!("An error has occurred when searching for the correct file: {}", e);
+
+            if error {
+                send_response(stream, &String::from("HTTP/1.1 404 NOT FOUND\r\n\r\n"));
+            } else {
+                send_file(&String::from("HTTP/1.1 404 NOT FOUND"), &String::from("./src/pages/404.html"), stream, true);
+            }
+        }
+    };
+}
+
+fn send_response(mut stream: &TcpStream, response: &String) {
+    match stream.write_all(response.as_bytes()) {
+        Ok(s) => s,
+        Err(e) => {
+            println!("An error has occurred when sending a response:\nError: {0}\nResponse: {1}", e, response);
+        }
     }
 }
