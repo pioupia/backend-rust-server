@@ -10,7 +10,7 @@ fn cb(str: String) {
 }
 
 fn main() {
-    let app: Server = Server::new();
+    let app: Server = Server::new(None);
     app.listen(
         None, None, cb
     );
