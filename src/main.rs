@@ -1,5 +1,5 @@
 pub mod server;
-pub mod types;
+pub mod thread_pool;
 
 use phf::{phf_set};
 use crate::server::Server;
