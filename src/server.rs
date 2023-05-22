@@ -2,7 +2,7 @@ use std::fs;
 use std::io::{BufRead, BufReader, Write};
 use std::net::{TcpListener, TcpStream};
 use phf::phf_set;
-use backend_rust_server::ThreadPool;
+use crate::thread_pool::ThreadPool;
 use crate::types::HttpRequestStatus;
 
 // List of authorized methods
