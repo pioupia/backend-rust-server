@@ -18,11 +18,13 @@ const HTTP_METHODS_LIST: phf::Set<&'static str> = phf_set! {
         "PATCH"
 };
 
-pub struct Server {}
+pub struct Server {
+    threads_size: usize
+}
 
 impl Server {
-    pub fn new() -> Server {
-        Server {}
+    pub fn new(threads_size: Option<usize>) -> Server {
+        Server { threads_size: threads_size.unwrap_or(4) }
     }
 
     pub fn listen(&self, address: Option<&str>, port: Option<&str>, callback: impl FnOnce(String)) -> Result<(), String> {
@@ -51,7 +53,7 @@ impl Server {
         };
 
         // Create a new ThreadPool
-        let pool = match ThreadPool::new(4) {
+        let pool = match ThreadPool::new(self.threads_size) {
             Ok(p) => p,
             Err(e) => {
                 return Err(
