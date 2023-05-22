@@ -18,13 +18,11 @@ const HTTP_METHODS_LIST: phf::Set<&'static str> = phf_set! {
         "PATCH"
 };
 
-pub struct Server {
-    address: &'static str
-}
+pub struct Server {}
 
 impl Server {
     pub fn new() -> Server {
-        Server { address: "127.0.0.1:8000" }
+        Server {}
     }
 
     pub fn listen(&self, address: Option<&str>, port: Option<&str>, callback: impl FnOnce(String)) -> Result<(), String> {
@@ -111,7 +109,7 @@ impl Server {
                 Err(e) => {
                     println!("An error has occurred during a request: {}", e);
 
-                    send_response(stream, &String::from("HTTP/1.1 500 Internal Server Error\r\n\r\n"));
+                    send_response(stream, &String::from("HTTP/1.1 500 Internal server Error\r\n\r\n"));
 
                     return Err("An error has occurred during the request");
                 }
@@ -126,7 +124,7 @@ impl Server {
             None => {
                 println!("An error has occurred during the parse of the request");
 
-                send_response(stream, &String::from("HTTP/1.1 500 Internal Server Error\r\n\r\n"));
+                send_response(stream, &String::from("HTTP/1.1 500 Internal server Error\r\n\r\n"));
 
                 return Err("An error has occurred during the parsing of the request");
             }
@@ -138,7 +136,7 @@ impl Server {
             Err(e) => {
                 println!("An error has occurred during the HTTP parsing of the request: {}", e);
 
-                send_response(stream, &String::from("HTTP/1.1 500 Internal Server Error\r\n\r\n"));
+                send_response(stream, &String::from("HTTP/1.1 500 Internal server Error\r\n\r\n"));
 
                 return Err("Not good bro")
             }
