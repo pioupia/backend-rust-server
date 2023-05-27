@@ -19,18 +19,25 @@ const HTTP_METHODS_LIST: phf::Set<&'static str> = phf_set! {
 };
 
 pub struct Server {
-    threads_size: usize
+    threads_size: usize,
+    public_directory: &'static str
 }
 
 impl Server {
     pub fn new(threads_size: Option<usize>) -> Server {
-        Server { threads_size: threads_size.unwrap_or(4) }
+        Server { threads_size: threads_size.unwrap_or(4), public_directory: "./src/pages" }
+    }
+
+    pub fn set_public_directory(&mut self, directory: &'static str) {
+        self.public_directory = directory;
     }
 
     pub fn listen(&self, address: Option<&str>, port: Option<&str>, callback: impl FnOnce(String)) -> Result<(), String> {
         let address = match address {
             Some(addr) => addr,
-            None => "127.0.0.1"
+            None => {
+                "127.0.0.1"
+            }
         };
 
         let port = match port {
@@ -74,9 +81,11 @@ impl Server {
                 }
             };
 
+            let pub_dir = self.public_directory;
+
             // Process the new connection, and pass a reference to the stream
             pool.execute(move || {
-                match Server::handle_request(&stream) {
+                match Server::handle_request(&stream, pub_dir) {
                     Ok(a) => a,
                     Err(_) => {}
                 }
@@ -87,7 +96,7 @@ impl Server {
     }
 
     // Create a new function named 'handle_request' which take a mutable TcpStream argument.
-    fn handle_request(stream: &TcpStream) -> Result<(), &str> {
+    fn handle_request(stream: &TcpStream, public_directory: &str) -> Result<(), &'static str> {
         // We'll create a new Buffer React to read the content of the mut stream
         let buffer_reader = BufReader::new(stream);
 
@@ -148,10 +157,10 @@ impl Server {
         let status_line = format!("HTTP/{} 200 OK", http_request_content.http_version);
 
         // Take the path of the file
-        let mut path = String::from("./src/pages/index.html");
+        let mut path = String::from(public_directory.to_owned() + "/index.html");
 
         if http_request_content.path != "/" {
-            path = format!("./src/pages/{}.html", http_request_content.path);
+            path = format!("{}/{}.html", public_directory, http_request_content.path);
         }
 
         // Return the file

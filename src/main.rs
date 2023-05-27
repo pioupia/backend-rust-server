@@ -6,11 +6,11 @@ use crate::server::Server;
 
 
 fn cb(str: String) {
-    println!("{}", str);
+    println!("The server is up on: http://{}", str);
 }
 
 fn main() {
-    let app: Server = Server::new(None);
+    let mut app: Server = Server::new(None);
     app.listen(
         None, None, cb
     );
