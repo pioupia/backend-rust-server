@@ -1,7 +1,8 @@
+use std::collections::HashSet;
 use std::fs;
 use std::io::{BufRead, BufReader, Write};
 use std::net::{TcpListener, TcpStream};
-use phf::phf_set;
+use phf::{phf_set};
 use crate::thread_pool::ThreadPool;
 use crate::types::HttpRequestStatus;
 
@@ -20,16 +21,44 @@ const HTTP_METHODS_LIST: phf::Set<&'static str> = phf_set! {
 
 pub struct Server {
     threads_size: usize,
-    public_directory: &'static str
+    public_directory: &'static str,
+    authorized_methods: HashSet<&'static str>
 }
 
 impl Server {
     pub fn new(threads_size: Option<usize>) -> Server {
-        Server { threads_size: threads_size.unwrap_or(4), public_directory: "./src/pages" }
+        let mut authorized_methods = HashSet::new();
+
+        for value in HTTP_METHODS_LIST.iter() {
+            authorized_methods.insert(*value);
+        }
+
+        authorized_methods.remove("TRACE");
+        authorized_methods.remove("CONNECT");
+
+        Server {
+            threads_size: threads_size.unwrap_or(4),
+            public_directory: "./src/pages",
+            authorized_methods
+        }
     }
 
     pub fn set_public_directory(&mut self, directory: &'static str) {
         self.public_directory = directory;
+    }
+
+    pub fn add_method(&mut self, method: &'static str) -> &mut Server {
+        if HTTP_METHODS_LIST.contains(method) {
+            self.authorized_methods.insert(method);
+        }
+
+        return self
+    }
+
+    pub fn remove_method(&mut self, method: &'static str) -> &mut Server {
+        self.authorized_methods.remove(method);
+
+        return self
     }
 
     pub fn listen(&self, address: Option<&str>, port: Option<&str>, callback: impl FnOnce(String)) -> Result<(), String> {
@@ -82,10 +111,12 @@ impl Server {
             };
 
             let pub_dir = self.public_directory;
+            let methods = &self.authorized_methods;
+            let clones = methods.clone();
 
             // Process the new connection, and pass a reference to the stream
             pool.execute(move || {
-                match Server::handle_request(&stream, pub_dir) {
+                match Server::handle_request(&stream, pub_dir, clones) {
                     Ok(a) => a,
                     Err(_) => {}
                 }
@@ -96,7 +127,7 @@ impl Server {
     }
 
     // Create a new function named 'handle_request' which take a mutable TcpStream argument.
-    fn handle_request(stream: &TcpStream, public_directory: &str) -> Result<(), &'static str> {
+    fn handle_request(stream: &TcpStream, public_directory: &str, methods_list: HashSet<&str>) -> Result<(), &'static str> {
         // We'll create a new Buffer React to read the content of the mut stream
         let buffer_reader = BufReader::new(stream);
 
@@ -142,7 +173,7 @@ impl Server {
         };
 
         // Parsing the status line to get the informations about it.
-        let http_request_content = match Server::parse_status_line(first_request_line) {
+        let http_request_content = match Server::parse_status_line(first_request_line, methods_list) {
             Ok(t) => t,
             Err(e) => {
                 println!("An error has occurred during the HTTP parsing of the request: {}", e);
@@ -169,7 +200,7 @@ impl Server {
         Ok(())
     }
 
-    fn parse_status_line(status_line: &String) -> Result<HttpRequestStatus, &str> {
+    fn parse_status_line(status_line: &String, methods_list: HashSet<&str>) -> Result<HttpRequestStatus, &'static str> {
         // Split the status line into piece of text without spaces.
         let status_line_parts: Vec<_> = status_line.split_whitespace().collect();
 
@@ -179,7 +210,7 @@ impl Server {
         }
 
         // If the first argument (the method) is not valid, we deny the request
-        if !HTTP_METHODS_LIST.contains(status_line_parts[0]) {
+        if !methods_list.contains(status_line_parts[0]) {
             return Err("The method is not correct.")
         }
 

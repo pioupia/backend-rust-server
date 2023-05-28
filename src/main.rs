@@ -11,7 +11,13 @@ fn cb(str: String) {
 
 fn main() {
     let mut app: Server = Server::new(None);
-    app.listen(
+
+    app
+        .remove_method("GET")
+        .remove_method("POST")
+        .add_method("GET");
+
+    let _ = app.listen(
         None, None, cb
     );
 }
